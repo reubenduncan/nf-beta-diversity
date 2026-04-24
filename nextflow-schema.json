@@ -1,0 +1,251 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema",
+    "$id": "https://raw.githubusercontent.com/reubenduncan/ecologyflow/main/projects/beta-diversity/nextflow-schema.json",
+    "title": "Beta Diversity Pipeline — Parameter Schema",
+    "description": "Nextflow pipeline for PCoA/NMDS ordination, PERMANOVA, and beta dispersion of microbiome feature tables.",
+    "type": "object",
+    "definitions": {
+        "input_output_options": {
+            "title": "Input / Output Options",
+            "type": "object",
+            "fa_icon": "fas fa-table",
+            "description": "Parameters for specifying input feature tables, metadata, and output location.",
+            "required": ["feature_table", "meta_table"],
+            "properties": {
+                "feature_table": {
+                    "type": "string",
+                    "fa_icon": "fas fa-file",
+                    "description": "Path to the input feature table (BIOM, TSV, or GTDB format).",
+                    "help_text": "Accepts BIOM files, tab-separated feature tables, or GTDB taxonomy output files."
+                },
+                "meta_table": {
+                    "type": "string",
+                    "fa_icon": "fas fa-file-csv",
+                    "description": "Path to sample metadata CSV file. First column must be sample IDs.",
+                    "help_text": "A comma-separated file where the first column contains sample identifiers matching the feature table."
+                },
+                "taxonomy_table": {
+                    "type": "string",
+                    "default": "",
+                    "fa_icon": "fas fa-file-alt",
+                    "description": "Path to a tab-separated taxonomy table (required for tsv/gtdb input formats).",
+                    "help_text": "Two-column TSV: feature ID and semicolon-separated taxonomy string. Handles SILVA (D_0__) and GTDB (d__) prefixes."
+                },
+                "tree_file": {
+                    "type": "string",
+                    "default": "",
+                    "fa_icon": "fas fa-tree",
+                    "description": "Path to a Newick phylogenetic tree (.nwk). Required for unifrac and wunifrac distances.",
+                    "help_text": "If unifrac or wunifrac distance is selected but no tree is provided, the pipeline falls back to bray-Curtis with a warning."
+                },
+                "input_format": {
+                    "type": "string",
+                    "default": "biom",
+                    "fa_icon": "fas fa-file-import",
+                    "description": "Format of the input feature table.",
+                    "help_text": "biom: QIIME2/BIOM format. tsv: tab-separated with taxonomy column. gtdb: same as tsv but with GTDB taxonomy prefixes.",
+                    "enum": ["biom", "tsv", "gtdb"]
+                },
+                "output_dir": {
+                    "type": "string",
+                    "default": "${projectDir}/results",
+                    "fa_icon": "fas fa-folder-open",
+                    "description": "Directory where output CSV files will be published.",
+                    "help_text": "Created automatically if it does not exist."
+                },
+                "scripts_dir": {
+                    "type": "string",
+                    "default": "/opt/ecology-scripts",
+                    "fa_icon": "fas fa-code",
+                    "description": "Path to the R scripts directory inside the container.",
+                    "help_text": "Defaults to the path used by the Docker image. Override if running without Docker."
+                }
+            }
+        },
+        "filtering_options": {
+            "title": "Filtering Options",
+            "type": "object",
+            "fa_icon": "fas fa-filter",
+            "description": "Parameters for filtering samples and features before analysis.",
+            "properties": {
+                "min_library_size": {
+                    "type": "integer",
+                    "default": 5000,
+                    "fa_icon": "fas fa-sort-numeric-up",
+                    "description": "Minimum total read count per sample. Samples below this threshold are removed.",
+                    "minimum": 1
+                },
+                "exclude_column": {
+                    "type": "string",
+                    "default": "",
+                    "fa_icon": "fas fa-ban",
+                    "description": "Metadata column used to identify samples for exclusion.",
+                    "help_text": "Used together with --exclude_values. Leave empty to disable."
+                },
+                "exclude_values": {
+                    "type": "string",
+                    "default": "",
+                    "fa_icon": "fas fa-times-circle",
+                    "description": "Comma-separated values in exclude_column that mark samples for removal.",
+                    "help_text": "e.g. 'Control,Blank' removes samples where exclude_column matches those values."
+                }
+            }
+        },
+        "grouping_options": {
+            "title": "Grouping Options",
+            "type": "object",
+            "fa_icon": "fas fa-layer-group",
+            "description": "Parameters defining how samples are assigned to groups and visual subgroups.",
+            "properties": {
+                "groups_column": {
+                    "type": "string",
+                    "default": "",
+                    "fa_icon": "fas fa-object-group",
+                    "description": "Metadata column to use as the primary grouping variable (Groups).",
+                    "help_text": "Mutually exclusive with groups_paste_columns. Required for beta dispersion."
+                },
+                "groups_paste_columns": {
+                    "type": "string",
+                    "default": "",
+                    "fa_icon": "fas fa-columns",
+                    "description": "Comma-separated metadata columns whose values are pasted together to form the Groups variable.",
+                    "help_text": "e.g. 'Treatment,Timepoint' creates groups like 'Control Day1'. Takes priority over groups_column."
+                },
+                "type_column": {
+                    "type": "string",
+                    "default": "",
+                    "fa_icon": "fas fa-shapes",
+                    "description": "Metadata column for a secondary grouping variable (Type), used for visual shape mapping.",
+                    "help_text": "Optional. Included in the coordinates CSV when provided."
+                },
+                "type2_column": {
+                    "type": "string",
+                    "default": "",
+                    "fa_icon": "fas fa-draw-polygon",
+                    "description": "Metadata column for a tertiary grouping variable (Type2), used for ellipse grouping.",
+                    "help_text": "Optional. Defaults to Groups when not set."
+                },
+                "connections_column": {
+                    "type": "string",
+                    "default": "",
+                    "fa_icon": "fas fa-link",
+                    "description": "Metadata column identifying which samples are connected by lines.",
+                    "help_text": "Optional. Included in the coordinates CSV for downstream use."
+                },
+                "subconnections_column": {
+                    "type": "string",
+                    "default": "",
+                    "fa_icon": "fas fa-project-diagram",
+                    "description": "Metadata column for a secondary level of sample connections.",
+                    "help_text": "Optional. Included in the coordinates CSV for downstream use."
+                }
+            }
+        },
+        "ordination_options": {
+            "title": "Ordination Options",
+            "type": "object",
+            "fa_icon": "fas fa-compass",
+            "description": "Parameters controlling ordination method, distance metric, and taxonomy level.",
+            "properties": {
+                "which_level": {
+                    "type": "string",
+                    "default": "Otus",
+                    "fa_icon": "fas fa-sitemap",
+                    "description": "Taxonomy level at which to collapse the feature table before ordination.",
+                    "enum": ["Otus", "Genus", "Family", "Order", "Class", "Phylum"]
+                },
+                "ordination_method": {
+                    "type": "string",
+                    "default": "pcoa",
+                    "fa_icon": "fas fa-chart-scatter",
+                    "description": "Ordination algorithm to use.",
+                    "help_text": "pcoa: Principal Coordinates Analysis (cmdscale). nmds: Non-metric Multidimensional Scaling (metaMDS). NMDS includes stress value in output.",
+                    "enum": ["pcoa", "nmds"]
+                },
+                "distance_metric": {
+                    "type": "string",
+                    "default": "bray",
+                    "fa_icon": "fas fa-ruler-combined",
+                    "description": "Comma-separated list of beta diversity distance metrics to run in parallel.",
+                    "help_text": "Supported values: bray (Bray-Curtis), jaccard, unifrac (Unweighted UniFrac; tree required), wunifrac (Weighted UniFrac; tree required), aitchison (CLR-transformed Euclidean). Multiple values run as separate parallel processes, e.g. 'bray,jaccard,wunifrac'. Results are written with the metric name embedded in each filename."
+                },
+                "ellipse_kind": {
+                    "type": "string",
+                    "default": "se",
+                    "fa_icon": "fas fa-circle-notch",
+                    "description": "Method used to compute ordination ellipses (passed to vegan::ordiellipse).",
+                    "enum": ["sd", "se"]
+                },
+                "label": {
+                    "type": "string",
+                    "default": "analysis",
+                    "fa_icon": "fas fa-tag",
+                    "description": "Analysis label appended to all output file names.",
+                    "help_text": "e.g. 'diet_study' produces PCOA_coords_bray_Otus_diet_study.csv"
+                }
+            }
+        },
+        "permanova_options": {
+            "title": "PERMANOVA Options",
+            "type": "object",
+            "fa_icon": "fas fa-calculator",
+            "description": "Parameters for PERMANOVA (adonis2) analysis run alongside ordination.",
+            "properties": {
+                "permanova_variables": {
+                    "type": "string",
+                    "default": "",
+                    "fa_icon": "fas fa-list",
+                    "description": "Comma-separated metadata column names to include in the PERMANOVA model.",
+                    "help_text": "e.g. 'Treatment,Age' fits dist ~ Treatment + Age. Leave empty to skip PERMANOVA."
+                },
+                "permanova_permutations": {
+                    "type": "integer",
+                    "default": 999,
+                    "fa_icon": "fas fa-random",
+                    "description": "Number of permutations for the PERMANOVA test.",
+                    "minimum": 99,
+                    "maximum": 99999
+                },
+                "p_adjust_method": {
+                    "type": "string",
+                    "default": "BH",
+                    "fa_icon": "fas fa-adjust",
+                    "description": "Method for adjusting PERMANOVA p-values for multiple comparisons.",
+                    "help_text": "BH: Benjamini-Hochberg FDR. bonferroni: Bonferroni correction. holm: Holm step-down. none: no adjustment (raw p-values).",
+                    "enum": ["BH", "bonferroni", "holm", "none"]
+                }
+            }
+        },
+        "dispersion_options": {
+            "title": "Beta Dispersion Options",
+            "type": "object",
+            "fa_icon": "fas fa-expand-arrows-alt",
+            "description": "Parameters specific to the beta dispersion (betadisper) process.",
+            "help_text": "Beta dispersion is run for all pairwise group comparisons. Either groups_column or groups_paste_columns is required."
+        },
+        "output_options": {
+            "title": "Output Options",
+            "type": "object",
+            "fa_icon": "fas fa-file-export",
+            "description": "Additional output formats produced after all analyses complete.",
+            "properties": {
+                "merge_parquet": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Merge all output CSVs into a single Parquet file with analysis, table, and distance_metric metadata columns.",
+                    "help_text": "Writes beta_diversity_{label}.parquet to output_dir. CSVs from all metrics are stacked with NA-fill; filter by 'distance_metric', 'analysis', and 'table' columns downstream.",
+                    "fa_icon": "fas fa-file-archive"
+                }
+            }
+        }
+    },
+    "allOf": [
+        { "$ref": "#/definitions/input_output_options" },
+        { "$ref": "#/definitions/filtering_options" },
+        { "$ref": "#/definitions/grouping_options" },
+        { "$ref": "#/definitions/ordination_options" },
+        { "$ref": "#/definitions/permanova_options" },
+        { "$ref": "#/definitions/dispersion_options" },
+        { "$ref": "#/definitions/output_options" }
+    ]
+}

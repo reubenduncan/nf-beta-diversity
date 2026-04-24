@@ -1,0 +1,16 @@
+name: ecologyflow-beta
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - r-base>=4.2.0
+  - r-optparse
+  - r-vegan
+  - r-ape
+  - r-phangorn
+  - r-stringr
+  - r-data.table
+  - bioconductor-phyloseq
+  - r-arrow
+  - nextflow>=23.04
