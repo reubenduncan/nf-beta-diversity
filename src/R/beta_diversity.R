@@ -213,11 +213,24 @@ if (taxon_rank == "Feature") {
     new_abund_table <- if (is.null(new_abund_table)) tmp else cbind(new_abund_table, tmp)
   }
 }
-new_abund_table <- as.data.frame(as(new_abund_table, "matrix"))
-abund_table     <- new_abund_table
+abund_table <- as.data.frame(as.matrix(new_abund_table))
 
 # ---- Build phyloseq object -------------------------------------------------
 OTU <- otu_table(as.matrix(abund_table), taxa_are_rows = FALSE)
+
+# When collapsed to a non-feature rank, feature_taxonomy still has ASV-level
+# row names and no longer matches the collapsed abund_table columns.
+# Rebuild a minimal taxonomy aligned to the current column names.
+if (taxon_rank != "Feature") {
+  rank_names_std <- c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Feature")
+  feature_taxonomy <- data.frame(
+    matrix("", nrow = ncol(abund_table), ncol = 7,
+           dimnames = list(colnames(abund_table), rank_names_std)),
+    stringsAsFactors = FALSE
+  )
+  feature_taxonomy[[taxon_rank]] <- colnames(abund_table)
+  feature_taxonomy$Feature       <- colnames(abund_table)
+}
 TAX <- tax_table(as.matrix(feature_taxonomy))
 SAM <- sample_data(meta_table)
 
