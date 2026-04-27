@@ -15,6 +15,7 @@ process BETA_DIVERSITY {
     val  distance_metric
     path feature_table
     path meta_table
+    path taxonomy_table
     path tree_file
 
     output:
@@ -23,8 +24,8 @@ process BETA_DIVERSITY {
     path "ADONIS_*.csv",         optional: true, emit: adonis
 
     script:
-    def tree_arg = (tree_file.name != 'NO_TREE') ? "--tree_file ${tree_file}" : ""
-    def tax_arg  = params.taxonomy_table ? "--taxonomy_table ${params.taxonomy_table}" : ""
+    def tree_arg = (tree_file.name != 'NO_TREE')       ? "--tree_file ${tree_file}"           : ""
+    def tax_arg  = (taxonomy_table.name != 'NO_TAXONOMY') ? "--taxonomy_table ${taxonomy_table}" : ""
     """
     Rscript ${projectDir}/src/R/beta_diversity.R \\
         --feature_table              ${feature_table} \\
@@ -57,14 +58,15 @@ process BETA_DISPERSION {
     val  distance_metric
     path feature_table
     path meta_table
+    path taxonomy_table
     path tree_file
 
     output:
     path "Betadisper_*.csv", optional: true, emit: betadisper
 
     script:
-    def tree_arg = (tree_file.name != 'NO_TREE') ? "--tree_file ${tree_file}" : ""
-    def tax_arg  = params.taxonomy_table ? "--taxonomy_table ${params.taxonomy_table}" : ""
+    def tree_arg = (tree_file.name != 'NO_TREE')         ? "--tree_file ${tree_file}"           : ""
+    def tax_arg  = (taxonomy_table.name != 'NO_TAXONOMY') ? "--taxonomy_table ${taxonomy_table}" : ""
     """
     Rscript ${projectDir}/src/R/beta_dispersion.R \\
         --feature_table              ${feature_table} \\
@@ -111,6 +113,9 @@ workflow {
     // Value channels — reused once per metric without being consumed
     feat_ch = Channel.fromPath(params.feature_table, checkIfExists: true).first()
     meta_ch = Channel.fromPath(params.meta_table,    checkIfExists: true).first()
+    tax_ch  = params.taxonomy_table
+        ? Channel.fromPath(params.taxonomy_table, checkIfExists: true).first()
+        : Channel.value(file('NO_TAXONOMY'))
     tree_ch = params.tree_file
         ? Channel.fromPath(params.tree_file, checkIfExists: true).first()
         : Channel.value(file('NO_TREE'))
@@ -118,8 +123,8 @@ workflow {
     // One invocation per metric, all running in parallel
     metrics_ch = Channel.of(params.distance_metric.tokenize(',').collect { it.trim() }).flatten()
 
-    bd_out   = BETA_DIVERSITY(metrics_ch, feat_ch, meta_ch, tree_ch)
-    disp_out = BETA_DISPERSION(metrics_ch, feat_ch, meta_ch, tree_ch)
+    bd_out   = BETA_DIVERSITY(metrics_ch, feat_ch, meta_ch, tax_ch, tree_ch)
+    disp_out = BETA_DISPERSION(metrics_ch, feat_ch, meta_ch, tax_ch, tree_ch)
 
     if (params.merge_parquet) {
         all_csvs = bd_out.pcoa_coords
