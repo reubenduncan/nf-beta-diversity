@@ -41,12 +41,8 @@ process BETA_DIVERSITY {
         --min_library_size           ${params.min_library_size} \\
         --exclude_column             "${params.exclude_column}" \\
         --exclude_values             "${params.exclude_values}" \\
-        --groups_column              "${params.groups_column}" \\
-        --groups_paste_columns       "${params.groups_paste_columns}" \\
-        --type_column                "${params.type_column}" \\
-        --type2_column               "${params.type2_column}" \\
-        --connections_column         "${params.connections_column}" \\
-        --subconnections_column      "${params.subconnections_column}" \\
+        ${params.group ? "--group '${params.group}'" : ""} \\
+        ${params.type  ? "--type  '${params.type}'"  : ""} \\
         --permanova_variables        "${params.permanova_variables}" \\
         --permanova_permutations     ${params.permanova_permutations} \\
         --p_adjust_method            ${params.p_adjust_method}
@@ -82,8 +78,7 @@ process BETA_DISPERSION {
         --min_library_size           ${params.min_library_size} \\
         --exclude_column             "${params.exclude_column}" \\
         --exclude_values             "${params.exclude_values}" \\
-        --groups_column              "${params.groups_column}" \\
-        --groups_paste_columns       "${params.groups_paste_columns}" \\
+        ${params.group ? "--group '${params.group}'" : ""} \\
         --p_adjust_method            ${params.p_adjust_method}
     """
 }

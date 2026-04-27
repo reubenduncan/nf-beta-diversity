@@ -12,7 +12,7 @@ This pipeline accepts a feature table (BIOM, TSV, or GTDB format) and a sample m
 nextflow run main.nf \
   --feature_table   /path/to/feature_table.biom \
   --meta_table      /path/to/meta_table.csv \
-  --groups_column   Treatment \
+  --group           Treatment \
   --distance_metric bray,jaccard \
   --label           my_analysis
 ```
@@ -42,12 +42,8 @@ nextflow run main.nf \
 
 | Parameter | Default | Description |
 |---|---|---|
-| `--groups_column` | `""` | Metadata column for the primary grouping variable |
-| `--groups_paste_columns` | `""` | Comma-separated columns pasted together to form groups |
-| `--type_column` | `""` | Secondary metadata column for shape mapping |
-| `--type2_column` | `""` | Tertiary metadata column for ellipse grouping |
-| `--connections_column` | `""` | Column identifying sample connections |
-| `--subconnections_column` | `""` | Column for secondary connection level |
+| `--group` | `""` | One metadata column, or comma-separated columns pasted together as the group label (e.g. `Treatment` or `Site,Treatment`) |
+| `--type` | `""` | One metadata column, or comma-separated columns pasted together as the point-style label — included in output CSVs (optional) |
 
 ### Ordination
 
@@ -102,7 +98,7 @@ nextflow run main.nf \
   -c nextflow.config \
   --feature_table   /path/to/table.biom \
   --meta_table      /path/to/meta.csv \
-  --groups_column   Treatment \
+  --group           Treatment \
   --distance_metric bray,jaccard \
   --label           my_analysis
 ```

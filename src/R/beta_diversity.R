@@ -55,18 +55,10 @@ option_list <- list(
   make_option("--exclude_values",  type = "character", default = "",
               help = "Comma-separated values to exclude"),
   # Grouping
-  make_option("--groups_column",        type = "character", default = "",
-              help = "Metadata column for Groups"),
-  make_option("--groups_paste_columns", type = "character", default = "",
-              help = "Comma-separated columns to paste for Groups"),
-  make_option("--type_column",          type = "character", default = "",
-              help = "Metadata column for Type (shape)"),
-  make_option("--type2_column",         type = "character", default = "",
-              help = "Metadata column for Type2 (ellipse grouping)"),
-  make_option("--connections_column",    type = "character", default = "",
-              help = "Metadata column for sample connections"),
-  make_option("--subconnections_column", type = "character", default = "",
-              help = "Metadata column for sub-connections"),
+  make_option("--group", type = "character", default = "",
+              help = "One metadata column, or comma-separated columns to paste as the group label"),
+  make_option("--type",  type = "character", default = "",
+              help = "One metadata column, or comma-separated columns to paste as the point-style label (optional)"),
   # PERMANOVA
   make_option("--permanova_variables",    type = "character", default = "",
               help = "Comma-separated metadata columns for PERMANOVA (adonis2)"),
@@ -137,14 +129,11 @@ check_col <- function(col, arg) {
     stop("Column '", col, "' specified by ", arg, " not found in metadata.")
 }
 check_col(opt$exclude_column,        "--exclude_column")
-check_col(opt$groups_column,         "--groups_column")
-check_col(opt$type_column,           "--type_column")
-check_col(opt$type2_column,          "--type2_column")
-check_col(opt$connections_column,    "--connections_column")
-check_col(opt$subconnections_column, "--subconnections_column")
-if (opt$groups_paste_columns != "") {
-  paste_cols <- trimws(strsplit(opt$groups_paste_columns, ",")[[1]])
-  for (col in paste_cols) check_col(col, "--groups_paste_columns")
+if (opt$group != "") {
+  for (col in trimws(strsplit(opt$group, ",")[[1]])) check_col(col, "--group")
+}
+if (opt$type != "") {
+  for (col in trimws(strsplit(opt$type, ",")[[1]])) check_col(col, "--type")
 }
 if (opt$permanova_variables != "") {
   perm_vars <- trimws(strsplit(opt$permanova_variables, ",")[[1]])
@@ -175,27 +164,31 @@ if (opt$exclude_column != "" && opt$exclude_values != "") {
   abund_table <- abund_table[rownames(meta_table), , drop = FALSE]
 }
 
-# ---- Build Groups factor ---------------------------------------------------
-if (opt$groups_paste_columns != "") {
-  paste_cols        <- trimws(strsplit(opt$groups_paste_columns, ",")[[1]])
-  meta_table$Groups <- as.factor(do.call(paste, c(meta_table[, paste_cols, drop = FALSE], sep = " ")))
-} else if (opt$groups_column != "") {
-  meta_table$Groups <- as.factor(as.character(meta_table[[opt$groups_column]]))
-} else {
-  meta_table$Groups <- as.factor(rep("All", nrow(meta_table)))
+# ---- Resolve grouping columns ----------------------------------------------
+resolve_columns <- function(param_val, param_name, meta) {
+  cols <- trimws(strsplit(param_val, ",")[[1]])
+  missing <- setdiff(cols, colnames(meta))
+  if (length(missing) > 0)
+    stop(param_name, " references columns not in metadata: ", paste(missing, collapse = ", "))
+  if (length(cols) == 1) {
+    as.factor(as.character(meta[[cols]]))
+  } else {
+    as.factor(do.call(paste, c(meta[, cols, drop = FALSE], sep = " ")))
+  }
 }
 
-# ---- Optional grouping columns ---------------------------------------------
-meta_table$Type <- if (opt$type_column != "")
-  as.factor(as.character(meta_table[[opt$type_column]])) else NULL
+if (opt$group != "") {
+  meta_table$Groups <- resolve_columns(opt$group, "--group", meta_table)
+} else {
+  meta_table$Groups <- as.factor(rep("All", nrow(meta_table)))
+  message("No --group specified — all samples assigned to group 'All'.")
+}
 
-meta_table$Type2 <- if (opt$type2_column != "")
-  as.factor(as.character(meta_table[[opt$type2_column]])) else meta_table$Groups
-
-meta_table$Connections    <- if (opt$connections_column != "")
-  as.character(meta_table[[opt$connections_column]]) else NULL
-meta_table$Subconnections <- if (opt$subconnections_column != "")
-  as.character(meta_table[[opt$subconnections_column]]) else NULL
+if (opt$type != "") {
+  meta_table$Type <- resolve_columns(opt$type, "--type", meta_table)
+} else {
+  meta_table$Type <- NULL
+}
 
 # ---- Re-align after all filtering ------------------------------------------
 abund_table  <- abund_table[rownames(meta_table), , drop = FALSE]
@@ -324,9 +317,7 @@ if (!is.null(sol)) {
     stringsAsFactors  = FALSE
   )
   if (!is.null(meta_table$Type))
-    coords_out$Type  <- as.character(PCOA$Type)
-  if (!is.null(meta_table$Type2))
-    coords_out$Type2 <- as.character(PCOA$Type2)
+    coords_out$Type <- as.character(PCOA$Type)
 
   coords_file <- file.path(
     opt$output_dir,
@@ -336,18 +327,14 @@ if (!is.null(sol)) {
   message("Written: ", coords_file)
 
   # ---- CSV 2: ellipse path points --------------------------------------------
-  if (is.null(meta_table$Type2)) meta_table$Type2 <- meta_table$Groups
-  if (is.null(PCOA$Type2))       PCOA$Type2       <- PCOA$Groups
-
   groups_levels <- levels(factor(PCOA$Groups))
-  type2_levels  <- levels(factor(PCOA$Type2))
 
   # Generate ellipses via ordiellipse (suppress graphics device noise)
   pdf(nullfile())
   ord_ell <- tryCatch(
     ordiellipse(
       ord      = if (ordination_method == "pcoa") sol else sol,
-      groups   = interaction(PCOA$Groups, PCOA$Type2),
+      groups   = PCOA$Groups,
       display  = "sites",
       kind     = opt$ellipse_kind,
       conf     = 0.95,
@@ -363,31 +350,27 @@ if (!is.null(sol)) {
   df_ell <- data.frame()
   if (!is.null(ord_ell)) {
     for (h in groups_levels) {
-      for (g in type2_levels) {
-        key <- paste(h, g, sep = ".")
-        if (key %in% names(ord_ell)) {
-          tryCatch({
-            sub_df <- PCOA[PCOA$Groups == h & PCOA$Type2 == g, ]
-            if (nrow(sub_df) >= 2) {
-              ell_pts <- veganCovEllipse(
-                ord_ell[[key]]$cov,
-                ord_ell[[key]]$center,
-                ord_ell[[key]]$scale
+      if (h %in% names(ord_ell)) {
+        tryCatch({
+          sub_df <- PCOA[PCOA$Groups == h, ]
+          if (nrow(sub_df) >= 2) {
+            ell_pts <- veganCovEllipse(
+              ord_ell[[h]]$cov,
+              ord_ell[[h]]$center,
+              ord_ell[[h]]$scale
+            )
+            df_ell <- rbind(df_ell,
+              data.frame(
+                x      = ell_pts[, 1],
+                y      = ell_pts[, 2],
+                Groups = h,
+                stringsAsFactors = FALSE
               )
-              df_ell <- rbind(df_ell,
-                data.frame(
-                  x      = ell_pts[, 1],
-                  y      = ell_pts[, 2],
-                  Groups = h,
-                  Type2  = g,
-                  stringsAsFactors = FALSE
-                )
-              )
-            }
-          }, error = function(e) {
-            message("WARNING: ellipse skipped for group '", h, "/", g, "': ", conditionMessage(e))
-          })
-        }
+            )
+          }
+        }, error = function(e) {
+          message("WARNING: ellipse skipped for group '", h, "': ", conditionMessage(e))
+        })
       }
     }
   }

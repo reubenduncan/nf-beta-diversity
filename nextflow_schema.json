@@ -97,49 +97,21 @@
             "title": "Grouping Options",
             "type": "object",
             "fa_icon": "fas fa-layer-group",
-            "description": "Parameters defining how samples are assigned to groups and visual subgroups.",
+            "description": "Parameters defining how samples are assigned to groups for ordination and dispersion.",
             "properties": {
-                "groups_column": {
+                "group": {
                     "type": "string",
                     "default": "",
                     "fa_icon": "fas fa-object-group",
-                    "description": "Metadata column to use as the primary grouping variable (Groups).",
-                    "help_text": "Mutually exclusive with groups_paste_columns. Required for beta dispersion."
+                    "description": "One metadata column, or comma-separated columns pasted together as the group label.",
+                    "help_text": "e.g. 'Treatment' or 'Treatment,Timepoint'. Required for beta dispersion."
                 },
-                "groups_paste_columns": {
-                    "type": "string",
-                    "default": "",
-                    "fa_icon": "fas fa-columns",
-                    "description": "Comma-separated metadata columns whose values are pasted together to form the Groups variable.",
-                    "help_text": "e.g. 'Treatment,Timepoint' creates groups like 'Control Day1'. Takes priority over groups_column."
-                },
-                "type_column": {
+                "type": {
                     "type": "string",
                     "default": "",
                     "fa_icon": "fas fa-shapes",
-                    "description": "Metadata column for a secondary grouping variable (Type), used for visual shape mapping.",
+                    "description": "One metadata column, or comma-separated columns pasted together as the point-style label.",
                     "help_text": "Optional. Included in the coordinates CSV when provided."
-                },
-                "type2_column": {
-                    "type": "string",
-                    "default": "",
-                    "fa_icon": "fas fa-draw-polygon",
-                    "description": "Metadata column for a tertiary grouping variable (Type2), used for ellipse grouping.",
-                    "help_text": "Optional. Defaults to Groups when not set."
-                },
-                "connections_column": {
-                    "type": "string",
-                    "default": "",
-                    "fa_icon": "fas fa-link",
-                    "description": "Metadata column identifying which samples are connected by lines.",
-                    "help_text": "Optional. Included in the coordinates CSV for downstream use."
-                },
-                "subconnections_column": {
-                    "type": "string",
-                    "default": "",
-                    "fa_icon": "fas fa-project-diagram",
-                    "description": "Metadata column for a secondary level of sample connections.",
-                    "help_text": "Optional. Included in the coordinates CSV for downstream use."
                 }
             }
         },
@@ -241,7 +213,7 @@
             "type": "object",
             "fa_icon": "fas fa-expand-arrows-alt",
             "description": "Parameters specific to the beta dispersion (betadisper) process.",
-            "help_text": "Beta dispersion is run for all pairwise group comparisons. Either groups_column or groups_paste_columns is required."
+            "help_text": "Beta dispersion is run for all pairwise group comparisons. --group is required."
         },
         "output_options": {
             "title": "Output Options",
