@@ -22,7 +22,7 @@ library(data.table)
 
   # Strip SILVA / GTDB prefixes
   strip_prefix <- function(x) {
-    x <- gsub("^D_0__|^d__", "", x)
+    x <- gsub("^D_0__|^d__|^k__", "", x)
     x <- gsub("^D_1__|^p__", "", x)
     x <- gsub("^D_2__|^c__", "", x)
     x <- gsub("^D_3__|^o__", "", x)
@@ -115,6 +115,27 @@ load_feature_table <- function(feature_table, input_format, taxonomy_table = NUL
       abund_mat <- abund_mat[, common, drop = FALSE]
       tax_raw   <- tax_raw[common,    , drop = FALSE]
       return(.prune_taxonomy(abund_mat, tax_raw))
+    } else if (!is.null(taxonomy_table) && taxonomy_table != "" && file.exists(taxonomy_table)) {
+      message("BIOM has no embedded taxonomy — loading separate taxonomy table: ", taxonomy_table)
+      tax_raw <- tryCatch(
+        as.data.frame(fread(taxonomy_table, sep = "\t", header = FALSE,
+                            check.names = FALSE, fill = TRUE)),
+        error = function(e) stop("Failed to read taxonomy table: ", conditionMessage(e))
+      )
+      feat_ids   <- as.character(tax_raw[[1]])
+      tax_strs   <- as.character(tax_raw[[2]])
+      tax_parsed <- as.data.frame(
+        t(mapply(.parse_tax_string, tax_strs)),
+        stringsAsFactors = FALSE
+      )
+      rownames(tax_parsed) <- feat_ids
+      colnames(tax_parsed) <- rank_names_std
+      common <- intersect(colnames(abund_mat), rownames(tax_parsed))
+      if (length(common) == 0)
+        stop("No feature IDs overlap between BIOM file and taxonomy table.")
+      abund_mat  <- abund_mat[, common, drop = FALSE]
+      tax_parsed <- tax_parsed[common, , drop = FALSE]
+      return(.prune_taxonomy(abund_mat, tax_parsed))
     } else {
       message(
         "BIOM file has no embedded taxonomy. All features treated as features. ",

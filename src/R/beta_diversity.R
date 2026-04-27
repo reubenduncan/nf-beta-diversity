@@ -100,10 +100,16 @@ tree_needed     <- distance_metric %in% c("unifrac", "wunifrac")
 tree_available  <- opt$tree_file != "" && file.exists(opt$tree_file)
 
 if (tree_needed && !tree_available) {
-  warning("Distance '", distance_metric, "' requires a tree file but none was found. ",
-          "Falling back to 'bray'.")
   message("WARNING: Falling back from '", distance_metric, "' to 'bray' (no tree file).")
   distance_metric <- "bray"
+  tree_needed     <- FALSE
+}
+
+if (tree_needed && opt$taxon_rank != "Feature") {
+  message("WARNING: Falling back from '", distance_metric,
+          "' to 'bray' (phylogenetic distances require --taxon_rank Feature).")
+  distance_metric <- "bray"
+  tree_needed     <- FALSE
 }
 
 # ---- Load data --------------------------------------------------------------
@@ -234,7 +240,7 @@ if (taxon_rank != "Feature") {
 TAX <- tax_table(as.matrix(feature_taxonomy))
 SAM <- sample_data(meta_table)
 
-if (taxon_rank == "Feature" && tree_available) {
+if (tree_needed && tree_available) {
   feature_tree           <- read.tree(opt$tree_file)
   feature_tree$tip.label <- gsub("'", "", feature_tree$tip.label)
   physeq <- merge_phyloseq(phyloseq(OTU, TAX), SAM, feature_tree)
