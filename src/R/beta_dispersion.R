@@ -96,10 +96,14 @@ ft_data <- load_feature_table(
   taxonomy_table = if (opt$taxonomy_table != "") opt$taxonomy_table else NULL
 )
 abund_table  <- ft_data$abund_table
-OTU_taxonomy <- ft_data$OTU_taxonomy
+feature_taxonomy <- ft_data$feature_taxonomy
 
 message("Loading metadata: ", opt$meta_table)
-meta_table <- read.csv(opt$meta_table, header = TRUE, row.names = 1, check.names = FALSE)
+meta_table <- local({
+  sep <- if (grepl("\t", readLines(opt$meta_table, n = 1, warn = FALSE))) "\t" else ","
+  read.table(opt$meta_table, header = TRUE, sep = sep, row.names = 1,
+             check.names = FALSE, stringsAsFactors = FALSE)
+})
 
 # ---- Validate metadata columns ---------------------------------------------
 check_col <- function(col, arg) {
@@ -126,7 +130,7 @@ if (length(common_samples) == 0)
   stop("No samples are shared between the feature table and metadata.")
 abund_table  <- abund_table[common_samples, , drop = FALSE]
 meta_table   <- meta_table[common_samples, , drop = FALSE]
-OTU_taxonomy <- OTU_taxonomy[colnames(abund_table), , drop = FALSE]
+feature_taxonomy <- feature_taxonomy[colnames(abund_table), , drop = FALSE]
 
 # ---- Exclusion filter ------------------------------------------------------
 if (opt$exclude_column != "" && opt$exclude_values != "") {
@@ -149,7 +153,7 @@ if (opt$groups_paste_columns != "") {
 # ---- Re-align -------------------------------------------------------------
 abund_table  <- abund_table[rownames(meta_table), , drop = FALSE]
 abund_table  <- abund_table[, colSums(abund_table) > 0, drop = FALSE]
-OTU_taxonomy <- OTU_taxonomy[colnames(abund_table), , drop = FALSE]
+feature_taxonomy <- feature_taxonomy[colnames(abund_table), , drop = FALSE]
 
 # ---- Minimum sample count check -------------------------------------------
 if (nrow(abund_table) < 3)
@@ -167,13 +171,13 @@ if (length(small_groups) > 0)
 
 # ---- Build phyloseq --------------------------------------------------------
 OTU <- otu_table(as.matrix(abund_table), taxa_are_rows = FALSE)
-TAX <- tax_table(as.matrix(OTU_taxonomy))
+TAX <- tax_table(as.matrix(feature_taxonomy))
 SAM <- sample_data(meta_table)
 
 if (tree_available) {
-  OTU_tree           <- read.tree(opt$tree_file)
-  OTU_tree$tip.label <- gsub("'", "", OTU_tree$tip.label)
-  physeq <- merge_phyloseq(phyloseq(OTU, TAX), SAM, OTU_tree)
+  feature_tree           <- read.tree(opt$tree_file)
+  feature_tree$tip.label <- gsub("'", "", feature_tree$tip.label)
+  physeq <- merge_phyloseq(phyloseq(OTU, TAX), SAM, feature_tree)
 } else {
   physeq <- merge_phyloseq(phyloseq(OTU, TAX), SAM)
 }

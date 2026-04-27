@@ -1,7 +1,7 @@
 {
     "$schema": "http://json-schema.org/draft-07/schema",
     "$id": "https://raw.githubusercontent.com/reubenduncan/ecologyflow/main/projects/beta-diversity/nextflow-schema.json",
-    "title": "Beta Diversity Pipeline — Parameter Schema",
+    "title": "Beta Diversity Pipeline \u2014 Parameter Schema",
     "description": "Nextflow pipeline for PCoA/NMDS ordination, PERMANOVA, and beta dispersion of microbiome feature tables.",
     "type": "object",
     "definitions": {
@@ -10,30 +10,35 @@
             "type": "object",
             "fa_icon": "fas fa-table",
             "description": "Parameters for specifying input feature tables, metadata, and output location.",
-            "required": ["feature_table", "meta_table"],
+            "required": [
+                "feature_table",
+                "meta_table"
+            ],
             "properties": {
                 "feature_table": {
                     "type": "string",
+                    "format": "file-path",
                     "fa_icon": "fas fa-file",
                     "description": "Path to the input feature table (BIOM, TSV, or GTDB format).",
                     "help_text": "Accepts BIOM files, tab-separated feature tables, or GTDB taxonomy output files."
                 },
                 "meta_table": {
                     "type": "string",
+                    "format": "file-path",
                     "fa_icon": "fas fa-file-csv",
                     "description": "Path to sample metadata CSV file. First column must be sample IDs.",
                     "help_text": "A comma-separated file where the first column contains sample identifiers matching the feature table."
                 },
                 "taxonomy_table": {
                     "type": "string",
-                    "default": "",
+                    "format": "file-path",
                     "fa_icon": "fas fa-file-alt",
                     "description": "Path to a tab-separated taxonomy table (required for tsv/gtdb input formats).",
                     "help_text": "Two-column TSV: feature ID and semicolon-separated taxonomy string. Handles SILVA (D_0__) and GTDB (d__) prefixes."
                 },
                 "tree_file": {
                     "type": "string",
-                    "default": "",
+                    "format": "file-path",
                     "fa_icon": "fas fa-tree",
                     "description": "Path to a Newick phylogenetic tree (.nwk). Required for unifrac and wunifrac distances.",
                     "help_text": "If unifrac or wunifrac distance is selected but no tree is provided, the pipeline falls back to bray-Curtis with a warning."
@@ -44,21 +49,18 @@
                     "fa_icon": "fas fa-file-import",
                     "description": "Format of the input feature table.",
                     "help_text": "biom: QIIME2/BIOM format. tsv: tab-separated with taxonomy column. gtdb: same as tsv but with GTDB taxonomy prefixes.",
-                    "enum": ["biom", "tsv", "gtdb"]
+                    "enum": [
+                        "biom",
+                        "tsv",
+                        "gtdb"
+                    ]
                 },
                 "output_dir": {
                     "type": "string",
-                    "default": "${projectDir}/results",
+                    "format": "file-path",
                     "fa_icon": "fas fa-folder-open",
                     "description": "Directory where output CSV files will be published.",
                     "help_text": "Created automatically if it does not exist."
-                },
-                "scripts_dir": {
-                    "type": "string",
-                    "default": "/opt/ecology-scripts",
-                    "fa_icon": "fas fa-code",
-                    "description": "Path to the R scripts directory inside the container.",
-                    "help_text": "Defaults to the path used by the Docker image. Override if running without Docker."
                 }
             }
         },
@@ -147,12 +149,19 @@
             "fa_icon": "fas fa-compass",
             "description": "Parameters controlling ordination method, distance metric, and taxonomy level.",
             "properties": {
-                "which_level": {
+                "taxon_rank": {
                     "type": "string",
-                    "default": "Otus",
+                    "default": "Feature",
                     "fa_icon": "fas fa-sitemap",
                     "description": "Taxonomy level at which to collapse the feature table before ordination.",
-                    "enum": ["Otus", "Genus", "Family", "Order", "Class", "Phylum"]
+                    "enum": [
+                        "Feature",
+                        "Genus",
+                        "Family",
+                        "Order",
+                        "Class",
+                        "Phylum"
+                    ]
                 },
                 "ordination_method": {
                     "type": "string",
@@ -160,7 +169,10 @@
                     "fa_icon": "fas fa-chart-scatter",
                     "description": "Ordination algorithm to use.",
                     "help_text": "pcoa: Principal Coordinates Analysis (cmdscale). nmds: Non-metric Multidimensional Scaling (metaMDS). NMDS includes stress value in output.",
-                    "enum": ["pcoa", "nmds"]
+                    "enum": [
+                        "pcoa",
+                        "nmds"
+                    ]
                 },
                 "distance_metric": {
                     "type": "string",
@@ -174,7 +186,10 @@
                     "default": "se",
                     "fa_icon": "fas fa-circle-notch",
                     "description": "Method used to compute ordination ellipses (passed to vegan::ordiellipse).",
-                    "enum": ["sd", "se"]
+                    "enum": [
+                        "sd",
+                        "se"
+                    ]
                 },
                 "label": {
                     "type": "string",
@@ -212,7 +227,12 @@
                     "fa_icon": "fas fa-adjust",
                     "description": "Method for adjusting PERMANOVA p-values for multiple comparisons.",
                     "help_text": "BH: Benjamini-Hochberg FDR. bonferroni: Bonferroni correction. holm: Holm step-down. none: no adjustment (raw p-values).",
-                    "enum": ["BH", "bonferroni", "holm", "none"]
+                    "enum": [
+                        "BH",
+                        "bonferroni",
+                        "holm",
+                        "none"
+                    ]
                 }
             }
         },
@@ -240,12 +260,26 @@
         }
     },
     "allOf": [
-        { "$ref": "#/definitions/input_output_options" },
-        { "$ref": "#/definitions/filtering_options" },
-        { "$ref": "#/definitions/grouping_options" },
-        { "$ref": "#/definitions/ordination_options" },
-        { "$ref": "#/definitions/permanova_options" },
-        { "$ref": "#/definitions/dispersion_options" },
-        { "$ref": "#/definitions/output_options" }
+        {
+            "$ref": "#/definitions/input_output_options"
+        },
+        {
+            "$ref": "#/definitions/filtering_options"
+        },
+        {
+            "$ref": "#/definitions/grouping_options"
+        },
+        {
+            "$ref": "#/definitions/ordination_options"
+        },
+        {
+            "$ref": "#/definitions/permanova_options"
+        },
+        {
+            "$ref": "#/definitions/dispersion_options"
+        },
+        {
+            "$ref": "#/definitions/output_options"
+        }
     ]
 }

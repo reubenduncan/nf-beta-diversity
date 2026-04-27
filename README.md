@@ -29,7 +29,6 @@ nextflow run main.nf \
 | `--tree_file` | `""` | Newick phylogenetic tree (required for `unifrac`/`wunifrac`) |
 | `--input_format` | `biom` | `biom` \| `tsv` \| `gtdb` |
 | `--output_dir` | `results/` | Directory for output files |
-| `--scripts_dir` | `/opt/ecology-scripts` | Path to R scripts (override for local runs) |
 
 ### Filtering
 
@@ -54,7 +53,7 @@ nextflow run main.nf \
 
 | Parameter | Default | Description |
 |---|---|---|
-| `--which_level` | `Otus` | Taxonomic level for feature collation (`Otus` \| `Genus` \| `Family` \| `Order` \| `Class` \| `Phylum`) |
+| `--taxon_rank` | `Feature` | Taxonomic level for feature collation (`Feature` \| `Genus` \| `Family` \| `Order` \| `Class` \| `Phylum`) |
 | `--ordination_method` | `pcoa` | `pcoa` (PCoA via cmdscale) \| `nmds` (metaMDS) |
 | `--distance_metric` | `bray` | Comma-separated list of metrics: `bray`, `jaccard`, `unifrac`, `wunifrac`, `aitchison` |
 | `--ellipse_kind` | `se` | Ellipse method passed to `vegan::ordiellipse`: `se` \| `sd` |
@@ -89,17 +88,23 @@ All files are written to `--output_dir`. Metric names are embedded in each filen
 ## Requirements
 
 - [Nextflow](https://www.nextflow.io/) ≥ 23.04
-- Docker (default) **or** a local R installation with: `optparse`, `vegan`, `ape`, `phangorn`, `stringr`, `data.table`, `phyloseq`, `arrow`
+- [conda](https://docs.conda.io/) or [mamba](https://mamba.readthedocs.io/) (default executor — environment built automatically from `environment.yml`)
+- **or** Docker with `-profile docker`
+- **or** Singularity with `-profile singularity`
+- **or** a local R installation with: `optparse`, `vegan`, `ape`, `phangorn`, `stringr`, `data.table`, `phyloseq`, `arrow`
 
-## Running without Docker
+## Running with a local R installation
+
+Add `-profile` to select your execution environment (conda is used by default if no profile is specified):
 
 ```bash
 nextflow run main.nf \
   -c nextflow.config \
-  --scripts_dir     "$(pwd)" \
   --feature_table   /path/to/table.biom \
   --meta_table      /path/to/meta.csv \
   --groups_column   Treatment \
   --distance_metric bray,jaccard \
   --label           my_analysis
 ```
+
+Available profiles: `conda` (default), `docker`, `singularity`.

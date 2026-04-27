@@ -34,8 +34,8 @@ option_list <- list(
   make_option("--output_dir",      type = "character", default = ".",
               help = "Output directory [default: .]"),
   # Taxonomy level
-  make_option("--which_level",     type = "character", default = "Otus",
-              help = "Taxonomy level: Otus | Genus | Family | Order | Class | Phylum [default: Otus]"),
+  make_option("--taxon_rank",     type = "character", default = "Feature",
+              help = "Taxonomy level: Feature | Genus | Family | Order | Class | Phylum [default: Feature]"),
   # Ordination
   make_option("--ordination_method", type = "character", default = "pcoa",
               help = "Ordination method: pcoa | nmds [default: pcoa]"),
@@ -90,14 +90,14 @@ valid_formats    <- c("biom", "tsv", "gtdb")
 valid_ordination <- c("pcoa", "nmds")
 valid_distances  <- c("bray", "jaccard", "unifrac", "wunifrac", "aitchison")
 valid_kinds      <- c("sd", "se")
-valid_levels     <- c("Otus", "Genus", "Family", "Order", "Class", "Phylum")
+valid_levels     <- c("Feature", "Genus", "Family", "Order", "Class", "Phylum")
 valid_padj       <- c("BH", "bonferroni", "holm", "none")
 
 if (!opt$input_format    %in% valid_formats)    stop("--input_format must be one of: ", paste(valid_formats, collapse=", "))
 if (!opt$ordination_method %in% valid_ordination) stop("--ordination_method must be one of: ", paste(valid_ordination, collapse=", "))
 if (!opt$distance_metric %in% valid_distances)  stop("--distance_metric must be one of: ", paste(valid_distances, collapse=", "))
 if (!opt$ellipse_kind    %in% valid_kinds)      stop("--ellipse_kind must be one of: sd, se")
-if (!opt$which_level     %in% valid_levels)     stop("--which_level must be one of: ", paste(valid_levels, collapse=", "))
+if (!opt$taxon_rank     %in% valid_levels)     stop("--taxon_rank must be one of: ", paste(valid_levels, collapse=", "))
 if (!opt$p_adjust_method %in% valid_padj)       stop("--p_adjust_method must be one of: ", paste(valid_padj, collapse=", "))
 
 if (!dir.exists(opt$output_dir)) dir.create(opt$output_dir, recursive = TRUE)
@@ -122,10 +122,14 @@ ft_data <- load_feature_table(
   taxonomy_table = if (opt$taxonomy_table != "") opt$taxonomy_table else NULL
 )
 abund_table  <- ft_data$abund_table
-OTU_taxonomy <- ft_data$OTU_taxonomy
+feature_taxonomy <- ft_data$feature_taxonomy
 
 message("Loading metadata: ", opt$meta_table)
-meta_table <- read.csv(opt$meta_table, header = TRUE, row.names = 1, check.names = FALSE)
+meta_table <- local({
+  sep <- if (grepl("\t", readLines(opt$meta_table, n = 1, warn = FALSE))) "\t" else ","
+  read.table(opt$meta_table, header = TRUE, sep = sep, row.names = 1,
+             check.names = FALSE, stringsAsFactors = FALSE)
+})
 
 # ---- Validate metadata columns ---------------------------------------------
 check_col <- function(col, arg) {
@@ -161,7 +165,7 @@ if (length(common_samples) == 0)
   stop("No samples are shared between the feature table and metadata.")
 abund_table  <- abund_table[common_samples, , drop = FALSE]
 meta_table   <- meta_table[common_samples, , drop = FALSE]
-OTU_taxonomy <- OTU_taxonomy[colnames(abund_table), , drop = FALSE]
+feature_taxonomy <- feature_taxonomy[colnames(abund_table), , drop = FALSE]
 
 # ---- Exclusion filter ------------------------------------------------------
 if (opt$exclude_column != "" && opt$exclude_values != "") {
@@ -196,21 +200,21 @@ meta_table$Subconnections <- if (opt$subconnections_column != "")
 # ---- Re-align after all filtering ------------------------------------------
 abund_table  <- abund_table[rownames(meta_table), , drop = FALSE]
 abund_table  <- abund_table[, colSums(abund_table) > 0, drop = FALSE]
-OTU_taxonomy <- OTU_taxonomy[colnames(abund_table), , drop = FALSE]
+feature_taxonomy <- feature_taxonomy[colnames(abund_table), , drop = FALSE]
 
 # ---- Minimum sample count check --------------------------------------------
 if (nrow(abund_table) < 3)
   stop("Fewer than 3 samples remain after filtering. Cannot run ordination.")
 
 # ---- Collate at taxonomic level --------------------------------------------
-which_level <- opt$which_level
-if (which_level == "Otus") {
+taxon_rank <- opt$taxon_rank
+if (taxon_rank == "Feature") {
   new_abund_table <- abund_table
 } else {
-  lvl_list        <- unique(OTU_taxonomy[, which_level])
+  lvl_list        <- unique(feature_taxonomy[, taxon_rank])
   new_abund_table <- NULL
   for (i in lvl_list) {
-    feature_idx <- rownames(OTU_taxonomy)[OTU_taxonomy[, which_level] == i]
+    feature_idx <- rownames(feature_taxonomy)[feature_taxonomy[, taxon_rank] == i]
     tmp <- data.frame(rowSums(abund_table[, feature_idx, drop = FALSE]))
     colnames(tmp) <- if (i == "") "__Unknowns__" else i
     new_abund_table <- if (is.null(new_abund_table)) tmp else cbind(new_abund_table, tmp)
@@ -221,13 +225,13 @@ abund_table     <- new_abund_table
 
 # ---- Build phyloseq object -------------------------------------------------
 OTU <- otu_table(as.matrix(abund_table), taxa_are_rows = FALSE)
-TAX <- tax_table(as.matrix(OTU_taxonomy))
+TAX <- tax_table(as.matrix(feature_taxonomy))
 SAM <- sample_data(meta_table)
 
-if (which_level == "Otus" && tree_available) {
-  OTU_tree           <- read.tree(opt$tree_file)
-  OTU_tree$tip.label <- gsub("'", "", OTU_tree$tip.label)
-  physeq <- merge_phyloseq(phyloseq(OTU, TAX), SAM, OTU_tree)
+if (taxon_rank == "Feature" && tree_available) {
+  feature_tree           <- read.tree(opt$tree_file)
+  feature_tree$tip.label <- gsub("'", "", feature_tree$tip.label)
+  physeq <- merge_phyloseq(phyloseq(OTU, TAX), SAM, feature_tree)
 } else {
   physeq <- merge_phyloseq(phyloseq(OTU, TAX), SAM)
 }
@@ -326,7 +330,7 @@ if (!is.null(sol)) {
 
   coords_file <- file.path(
     opt$output_dir,
-    paste0("PCOA_coords_", distance_metric, "_", which_level, "_", opt$label, ".csv")
+    paste0("PCOA_coords_", distance_metric, "_", taxon_rank, "_", opt$label, ".csv")
   )
   write.csv(coords_out, coords_file, row.names = FALSE)
   message("Written: ", coords_file)
@@ -390,7 +394,7 @@ if (!is.null(sol)) {
 
   ell_file <- file.path(
     opt$output_dir,
-    paste0("PCOA_ellipses_", distance_metric, "_", which_level, "_", opt$label, ".csv")
+    paste0("PCOA_ellipses_", distance_metric, "_", taxon_rank, "_", opt$label, ".csv")
   )
   write.csv(df_ell, ell_file, row.names = FALSE)
   message("Written: ", ell_file)
@@ -434,7 +438,7 @@ if (!is.null(sol)) {
 
       adonis_file <- file.path(
         opt$output_dir,
-        paste0("ADONIS_", distance_metric, "_", which_level, "_", opt$label, ".csv")
+        paste0("ADONIS_", distance_metric, "_", taxon_rank, "_", opt$label, ".csv")
       )
       write.csv(adonis_df, adonis_file, row.names = FALSE)
       message("Written: ", adonis_file)

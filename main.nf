@@ -26,14 +26,14 @@ process BETA_DIVERSITY {
     def tree_arg = (tree_file.name != 'NO_TREE') ? "--tree_file ${tree_file}" : ""
     def tax_arg  = params.taxonomy_table ? "--taxonomy_table ${params.taxonomy_table}" : ""
     """
-    Rscript ${params.scripts_dir}/src/R/beta_diversity.R \\
+    Rscript ${projectDir}/src/R/beta_diversity.R \\
         --feature_table              ${feature_table} \\
         --input_format               ${params.input_format} \\
         ${tax_arg} \\
         --meta_table                 ${meta_table} \\
         ${tree_arg} \\
         --output_dir                 . \\
-        --which_level                ${params.which_level} \\
+        --taxon_rank                ${params.taxon_rank} \\
         --ordination_method          ${params.ordination_method} \\
         --distance_metric            ${distance_metric} \\
         --ellipse_kind               ${params.ellipse_kind} \\
@@ -70,7 +70,7 @@ process BETA_DISPERSION {
     def tree_arg = (tree_file.name != 'NO_TREE') ? "--tree_file ${tree_file}" : ""
     def tax_arg  = params.taxonomy_table ? "--taxonomy_table ${params.taxonomy_table}" : ""
     """
-    Rscript ${params.scripts_dir}/src/R/beta_dispersion.R \\
+    Rscript ${projectDir}/src/R/beta_dispersion.R \\
         --feature_table              ${feature_table} \\
         --input_format               ${params.input_format} \\
         ${tax_arg} \\
@@ -103,7 +103,7 @@ process MERGE_PARQUET {
 
     script:
     """
-    Rscript ${params.scripts_dir}/src/R/merge_parquet.R \\
+    Rscript ${projectDir}/src/R/merge_parquet.R \\
         --label      '${params.label}' \\
         --output_dir '.'
     """

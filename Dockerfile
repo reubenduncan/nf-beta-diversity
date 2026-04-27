@@ -45,7 +45,7 @@ RUN LIBARROW_BINARY=true Rscript -e " \
 "
 
 # Copy R scripts into the container
-COPY src/R/ /opt/ecology-scripts/
+COPY src/ /opt/ecology-scripts/src/
 
 # Verify key packages load correctly
 RUN Rscript -e " \
