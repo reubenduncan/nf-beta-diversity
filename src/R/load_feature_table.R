@@ -99,22 +99,35 @@ load_feature_table <- function(feature_table, input_format, taxonomy_table = NUL
     # Ensure samples are rows
     if (taxa_are_rows(physeq)) abund_mat <- t(abund_mat)
 
-    tax_raw         <- as.data.frame(tax_table(physeq))
-    n_cols          <- ncol(tax_raw)
-    rank_names_std  <- c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Feature")
-    if (n_cols >= 7) {
-      colnames(tax_raw)[1:7] <- rank_names_std
+    rank_names_std <- c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Feature")
+
+    if (inherits(physeq, "phyloseq")) {
+      tax_raw <- as.data.frame(tax_table(physeq))
+      n_cols  <- ncol(tax_raw)
+      if (n_cols >= 7) {
+        colnames(tax_raw)[1:7] <- rank_names_std
+      } else {
+        colnames(tax_raw) <- rank_names_std[seq_len(n_cols)]
+        for (r in rank_names_std[seq(n_cols + 1, 7)]) tax_raw[[r]] <- ""
+      }
+      tax_raw <- .strip_tax_df_prefixes(tax_raw)
+      common  <- intersect(colnames(abund_mat), rownames(tax_raw))
+      abund_mat <- abund_mat[, common, drop = FALSE]
+      tax_raw   <- tax_raw[common,    , drop = FALSE]
+      return(.prune_taxonomy(abund_mat, tax_raw))
     } else {
-      colnames(tax_raw) <- rank_names_std[seq_len(n_cols)]
-      for (r in rank_names_std[seq(n_cols + 1, 7)]) tax_raw[[r]] <- ""
+      message(
+        "BIOM file has no embedded taxonomy. All features treated as features. ",
+        "Use --taxon_rank Feature, or supply a separate --taxonomy_table."
+      )
+      tax_raw <- data.frame(
+        matrix("", nrow = ncol(abund_mat), ncol = 7,
+               dimnames = list(colnames(abund_mat), rank_names_std)),
+        stringsAsFactors = FALSE
+      )
+      tax_raw$Feature <- colnames(abund_mat)
+      return(list(abund_table = abund_mat, feature_taxonomy = tax_raw))
     }
-    tax_raw <- .strip_tax_df_prefixes(tax_raw)
-    # Align features
-    common_features <- intersect(colnames(abund_mat), rownames(tax_raw))
-    abund_mat <- abund_mat[, common_features, drop = FALSE]
-    tax_raw   <- tax_raw[common_features, , drop = FALSE]
-    pruned    <- .prune_taxonomy(abund_mat, tax_raw)
-    return(pruned)
   }
 
   # ---- TSV / GTDB ---------------------------------------------------------
