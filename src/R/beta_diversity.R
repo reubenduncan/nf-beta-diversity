@@ -41,6 +41,8 @@ option_list <- list(
               help = "Ordination method: pcoa | nmds [default: pcoa]"),
   make_option("--distance_metric", type = "character", default = "bray",
               help = "Distance metric: bray | jaccard | unifrac | wunifrac | aitchison [default: bray]"),
+  make_option("--output_metric",  type = "character", default = "",
+              help = "Metric tag used in output filenames (set by Nextflow; defaults to distance_metric)"),
   # Ellipses
   make_option("--ellipse_kind",    type = "character", default = "se",
               help = "Ellipse type: sd | se [default: se]"),
@@ -100,17 +102,18 @@ tree_needed     <- distance_metric %in% c("unifrac", "wunifrac")
 tree_available  <- opt$tree_file != "" && file.exists(opt$tree_file)
 
 if (tree_needed && !tree_available) {
-  message("WARNING: Falling back from '", distance_metric, "' to 'bray' (no tree file).")
-  distance_metric <- "bray"
-  tree_needed     <- FALSE
+  message("SKIP: '", opt$distance_metric, "' requires a phylogenetic tree but none was provided.",
+          " Re-run with --tree_file to enable this metric.")
+  quit(save = "no", status = 0)
 }
 
 if (tree_needed && opt$taxon_rank != "Feature") {
-  message("WARNING: Falling back from '", distance_metric,
-          "' to 'bray' (phylogenetic distances require --taxon_rank Feature).")
-  distance_metric <- "bray"
-  tree_needed     <- FALSE
+  message("SKIP: '", opt$distance_metric, "' requires --taxon_rank Feature —",
+          " phylogenetic distances cannot be computed on collapsed taxa.")
+  quit(save = "no", status = 0)
 }
+
+output_metric <- if (nchar(opt$output_metric) > 0) opt$output_metric else distance_metric
 
 # ---- Load data --------------------------------------------------------------
 message("Loading feature table...")
@@ -340,7 +343,7 @@ if (!is.null(sol)) {
 
   coords_file <- file.path(
     opt$output_dir,
-    paste0("PCOA_coords_", distance_metric, "_", taxon_rank, "_", opt$label, ".csv")
+    paste0("PCOA_coords_", output_metric, "_", taxon_rank, "_", opt$label, ".csv")
   )
   write.csv(coords_out, coords_file, row.names = FALSE)
   message("Written: ", coords_file)
@@ -396,7 +399,7 @@ if (!is.null(sol)) {
 
   ell_file <- file.path(
     opt$output_dir,
-    paste0("PCOA_ellipses_", distance_metric, "_", taxon_rank, "_", opt$label, ".csv")
+    paste0("PCOA_ellipses_", output_metric, "_", taxon_rank, "_", opt$label, ".csv")
   )
   write.csv(df_ell, ell_file, row.names = FALSE)
   message("Written: ", ell_file)
@@ -440,7 +443,7 @@ if (!is.null(sol)) {
 
       adonis_file <- file.path(
         opt$output_dir,
-        paste0("ADONIS_", distance_metric, "_", taxon_rank, "_", opt$label, ".csv")
+        paste0("ADONIS_", output_metric, "_", taxon_rank, "_", opt$label, ".csv")
       )
       write.csv(adonis_df, adonis_file, row.names = FALSE)
       message("Written: ", adonis_file)

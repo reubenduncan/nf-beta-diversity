@@ -36,6 +36,8 @@ option_list <- list(
   # Distance metric
   make_option("--distance_metric", type = "character", default = "bray",
               help = "Distance metric: bray | jaccard | unifrac | wunifrac | aitchison [default: bray]"),
+  make_option("--output_metric",  type = "character", default = "",
+              help = "Metric tag used in output filenames (set by Nextflow; defaults to distance_metric)"),
   # Label
   make_option("--label",           type = "character", default = "analysis",
               help = "Analysis label used in output filenames [default: analysis]"),
@@ -80,11 +82,12 @@ tree_needed     <- distance_metric %in% c("unifrac", "wunifrac")
 tree_available  <- opt$tree_file != "" && file.exists(opt$tree_file)
 
 if (tree_needed && !tree_available) {
-  warning("Distance '", distance_metric, "' requires a tree file but none was found. ",
-          "Falling back to 'bray'.")
-  message("WARNING: Falling back from '", distance_metric, "' to 'bray' (no tree file).")
-  distance_metric <- "bray"
+  message("SKIP: '", opt$distance_metric, "' requires a phylogenetic tree but none was provided.",
+          " Re-run with --tree_file to enable this metric.")
+  quit(save = "no", status = 0)
 }
+
+output_metric <- if (nchar(opt$output_metric) > 0) opt$output_metric else distance_metric
 
 # ---- Load data --------------------------------------------------------------
 message("Loading feature table...")
@@ -295,7 +298,7 @@ df$significant <- !is.na(df$padj) & df$padj <= 0.05
 # ---- Write CSV -------------------------------------------------------------
 out_file <- file.path(
   opt$output_dir,
-  paste0("Betadisper_", distance_metric, "_", opt$label, ".csv")
+  paste0("Betadisper_", output_metric, "_", opt$label, ".csv")
 )
 write.csv(df, out_file, row.names = FALSE)
 message("Written: ", out_file)

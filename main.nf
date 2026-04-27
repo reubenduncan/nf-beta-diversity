@@ -37,6 +37,7 @@ process BETA_DIVERSITY {
         --taxon_rank                ${params.taxon_rank} \\
         --ordination_method          ${params.ordination_method} \\
         --distance_metric            ${distance_metric} \\
+        --output_metric              ${distance_metric} \\
         --ellipse_kind               ${params.ellipse_kind} \\
         --label                      ${params.label} \\
         --min_library_size           ${params.min_library_size} \\
@@ -76,6 +77,7 @@ process BETA_DISPERSION {
         ${tree_arg} \\
         --output_dir                 . \\
         --distance_metric            ${distance_metric} \\
+        --output_metric              ${distance_metric} \\
         --label                      ${params.label} \\
         --min_library_size           ${params.min_library_size} \\
         --exclude_column             "${params.exclude_column}" \\
