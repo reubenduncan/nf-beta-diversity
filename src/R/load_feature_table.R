@@ -4,7 +4,7 @@
 #   $abund_table  — samples x features numeric matrix
 #   $feature_taxonomy — data.frame with cols Kingdom,Phylum,Class,Order,Family,Genus,Feature
 
-library(phyloseq)
+library(biomformat)
 library(stringr)
 library(data.table)
 
@@ -90,26 +90,35 @@ load_feature_table <- function(feature_table, input_format, taxonomy_table = NUL
     if (!file.exists(feature_table))
       stop("BIOM file not found: ", feature_table)
 
-    physeq <- tryCatch(
-      import_biom(feature_table),
-      error = function(e) stop("Failed to import BIOM file: ", conditionMessage(e))
+    biom_obj <- tryCatch(
+      biomformat::read_biom(feature_table),
+      error = function(e) stop("Failed to read BIOM file: ", conditionMessage(e))
     )
 
-    abund_mat <- as.matrix(otu_table(physeq))
-    # Ensure samples are rows
-    if (taxa_are_rows(physeq)) abund_mat <- t(abund_mat)
+    # biom_data() returns a sparse matrix (features × samples); transpose to samples × features
+    abund_mat <- tryCatch(
+      t(as.matrix(biomformat::biom_data(biom_obj))),
+      error = function(e) stop("Failed to extract abundance data from BIOM: ", conditionMessage(e))
+    )
 
     rank_names_std <- c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Feature")
 
-    if (inherits(physeq, "phyloseq")) {
-      tax_raw <- as.data.frame(tax_table(physeq))
-      n_cols  <- ncol(tax_raw)
-      if (n_cols >= 7) {
-        colnames(tax_raw)[1:7] <- rank_names_std
-      } else {
-        colnames(tax_raw) <- rank_names_std[seq_len(n_cols)]
-        for (r in rank_names_std[seq(n_cols + 1, 7)]) tax_raw[[r]] <- ""
-      }
+    # Check for embedded taxonomy in BIOM observation metadata
+    obs_meta <- tryCatch(biomformat::observation_metadata(biom_obj), error = function(e) NULL)
+    has_taxonomy <- !is.null(obs_meta) && length(obs_meta) > 0
+
+    if (has_taxonomy) {
+      tax_list <- lapply(obs_meta, function(m) {
+        tx <- if (is.list(m) && !is.null(m$taxonomy)) m$taxonomy
+              else if (is.character(m))               m
+              else                                    character(0)
+        result <- setNames(rep("", 7), rank_names_std)
+        n <- min(length(tx), 7)
+        if (n > 0) result[seq_len(n)] <- as.character(tx[seq_len(n)])
+        result
+      })
+      tax_raw <- as.data.frame(do.call(rbind, tax_list), stringsAsFactors = FALSE)
+      colnames(tax_raw) <- rank_names_std
       tax_raw <- .strip_tax_df_prefixes(tax_raw)
       common  <- intersect(colnames(abund_mat), rownames(tax_raw))
       abund_mat <- abund_mat[, common, drop = FALSE]
@@ -118,18 +127,26 @@ load_feature_table <- function(feature_table, input_format, taxonomy_table = NUL
     } else if (!is.null(taxonomy_table) && taxonomy_table != "" && file.exists(taxonomy_table)) {
       message("BIOM has no embedded taxonomy — loading separate taxonomy table: ", taxonomy_table)
       tax_raw <- tryCatch(
-        as.data.frame(fread(taxonomy_table, sep = "\t", header = FALSE,
+        as.data.frame(fread(taxonomy_table, header = TRUE,
                             check.names = FALSE, fill = TRUE)),
         error = function(e) stop("Failed to read taxonomy table: ", conditionMessage(e))
       )
-      feat_ids   <- as.character(tax_raw[[1]])
-      tax_strs   <- as.character(tax_raw[[2]])
-      tax_parsed <- as.data.frame(
-        t(mapply(.parse_tax_string, tax_strs)),
-        stringsAsFactors = FALSE
-      )
-      rownames(tax_parsed) <- feat_ids
-      colnames(tax_parsed) <- rank_names_std
+      colnames(tax_raw)[1] <- sub("^﻿", "", colnames(tax_raw)[1])
+      feat_ids <- as.character(tax_raw[[1]])
+      if (ncol(tax_raw) >= 8) {
+        tax_parsed <- as.data.frame(tax_raw[, 2:8, drop = FALSE], stringsAsFactors = FALSE)
+        colnames(tax_parsed) <- rank_names_std
+        rownames(tax_parsed) <- feat_ids
+        tax_parsed <- .strip_tax_df_prefixes(tax_parsed)
+      } else {
+        tax_strs   <- as.character(tax_raw[[2]])
+        tax_parsed <- as.data.frame(
+          t(mapply(.parse_tax_string, tax_strs)),
+          stringsAsFactors = FALSE
+        )
+        rownames(tax_parsed) <- feat_ids
+        colnames(tax_parsed) <- rank_names_std
+      }
       common <- intersect(colnames(abund_mat), rownames(tax_parsed))
       if (length(common) == 0)
         stop("No feature IDs overlap between BIOM file and taxonomy table.")
@@ -183,19 +200,26 @@ load_feature_table <- function(feature_table, input_format, taxonomy_table = NUL
     if (!is.null(taxonomy_table) && taxonomy_table != "" && file.exists(taxonomy_table)) {
       message("Loading taxonomy table: ", taxonomy_table)
       tax_raw <- tryCatch(
-        as.data.frame(fread(taxonomy_table, sep = "\t", header = FALSE,
+        as.data.frame(fread(taxonomy_table, header = TRUE,
                             check.names = FALSE, fill = TRUE)),
         error = function(e) stop("Failed to read taxonomy table: ", conditionMessage(e))
       )
-      # Col 1 = feature ID, col 2 = taxonomy string (semicolon-separated)
-      feat_ids   <- as.character(tax_raw[[1]])
-      tax_strs   <- as.character(tax_raw[[2]])
-      tax_parsed <- as.data.frame(
-        t(mapply(.parse_tax_string, tax_strs)),
-        stringsAsFactors = FALSE
-      )
-      rownames(tax_parsed) <- feat_ids
-      colnames(tax_parsed) <- ranks_std
+      colnames(tax_raw)[1] <- sub("^﻿", "", colnames(tax_raw)[1])
+      feat_ids <- as.character(tax_raw[[1]])
+      if (ncol(tax_raw) >= 8) {
+        tax_parsed <- as.data.frame(tax_raw[, 2:8, drop = FALSE], stringsAsFactors = FALSE)
+        colnames(tax_parsed) <- ranks_std
+        rownames(tax_parsed) <- feat_ids
+        tax_parsed <- .strip_tax_df_prefixes(tax_parsed)
+      } else {
+        tax_strs  <- as.character(tax_raw[[2]])
+        tax_parsed <- as.data.frame(
+          t(mapply(.parse_tax_string, tax_strs)),
+          stringsAsFactors = FALSE
+        )
+        rownames(tax_parsed) <- feat_ids
+        colnames(tax_parsed) <- ranks_std
+      }
 
       # Align features between abundance table and taxonomy
       common_features <- intersect(colnames(abund_mat), rownames(tax_parsed))
